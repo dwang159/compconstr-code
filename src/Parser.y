@@ -33,6 +33,7 @@ import Pretty (render, pp)
 
 %token
     VAR                              { (TVar _, _)                          }
+    CTR                              { (TCtr _, _)                          }
 
     '='                              { (TEquals, $$)                        }
     ';'                              { (TSemicolon, $$)                     }
@@ -88,6 +89,7 @@ expr : LET binds IN expr             {% mkLetE $1 $2 $4                     }
      | LETREC binds IN expr          {% mkLetRecE $1 $2 $4                  }
      | CASE expr OF alts             {% mkCaseE $1 $2 $4                    }
      | VAR atoms                     {% mkAppE $1 $2                        }
+     | CTR atoms                     {% mkCtrE $1 $2                        }
      | OP atoms                      {% mkOpE $1 $2                         }
      | INT                           {% mkLitE $1                           }
 
@@ -106,7 +108,7 @@ aaltL : aalt ';'                     { singleton $1                         }
       | aaltL aalt ';'               { snoc $1 $2                           }
 
 aalt :: { AlgAlt }
-aalt :                               { undefined                            }
+aalt : CTR vars '->' expr            {% mkAlgAlt $1 $2 $4}
 
 palts :: { [PrimAlt] }
 palts : paltL                        { toList $1                            }

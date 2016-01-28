@@ -62,6 +62,7 @@ stg :-
     "/#"                        { makeToken (TPrimOp PrimDiv)               }
 
     @var                        { makeTokenWith TVar                        }
+    @ctr                        { makeTokenWith TCtr                        }
 {
 --------------------------------------------------------------------------------
 

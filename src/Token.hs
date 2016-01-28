@@ -21,6 +21,7 @@ import Prim
 
 -- | Enumerates token types.
 data Token = TVar String -- ^ Variables [a-z][a-zA-Z0-9]*
+           | TCtr String -- ^ Constructors [a-z][a-zA-Z0-9]*
 
            -- symbols
            | TEquals
@@ -53,6 +54,7 @@ data Token = TVar String -- ^ Variables [a-z][a-zA-Z0-9]*
 
 instance PP Token where
     pp (TVar xs)     = text "variable" <+> text xs
+    pp (TCtr xs)     = text "constructor" <+> text xs
 
     pp TEquals       = char '='
     pp TSemicolon    = char ';'
