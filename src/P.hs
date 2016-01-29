@@ -84,7 +84,7 @@ mkAppE :: TokenP -> [Atom] -> P Expr
 mkAppE (TVar var, pos) as = return $ AppE var as (toPosn pos)
 
 mkCtrE :: TokenP -> [Atom] -> P Expr
-mkCtrE (TCtr ctr, pos) as = return $ CtrE ctr as (toPos pos)
+mkCtrE (TCtr ctr, pos) as = return $ CtrE ctr as (toPosn pos)
 
 mkOpE :: TokenP -> [Atom] -> P Expr
 mkOpE (TPrimOp op, pos) as = return $ OpE op as (toPosn pos)
