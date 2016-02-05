@@ -114,6 +114,7 @@ mkInt :: TokenP -> P Atom
 mkInt (TPrimInt val, pos) = return $ LitAtom val (toPosn pos)
 
 -------------------------------------------------------------------------------
+-- Getting lists of free values found in the AST
 
 -- gets expression FVs
 getExprFVs :: Expr -> [Var] -> [Var]
@@ -166,26 +167,25 @@ getPrimAltFVs ((PAlt _ expr _) : alts) bvs = getExprFVs expr bvs `union`
     getPrimAltFVs alts bvs
 getPrimAltFVs [] bvs = []
 
--- AAlt
-getAAltFVs (AAlt _ vs expr _) bvs = getExprFVs expr (bvs `union` vs)
-
--- PAlt
-getPAltFVs (PAlt _ expr _) bvs = getExprFVs expr bvs
-
-
 -- Default Alts
 getDAltFVs :: DefaultAlt -> [Var] -> [Var]
 getDAltFVs (Default expr _) bvs = getExprFVs expr bvs
 getDAltFVs (DefaultVar v expr _) bvs = getExprFVs expr (v : bvs)
 
+
+------------------------------------------------------------------------------
+-- Free value checks
+
+-- Check the whole program for correct free values
 checkProgFVs :: Prog -> Bool
 checkProgFVs (MkProg binds) = foldl (&&) True (map (\b -> checkBindFVs b gs) binds)
     where gs = map bindName binds
 
+-- Check bindings
 checkBindFVs :: Bind -> [Var] -> Bool
 checkBindFVs (MkBind v lf _) bvs = if trace (show v ++ show bvs) True then checkLamFVs lf bvs else False
 
--- Check lambda free variables by calculating set of free variables from the
+-- Check lambda free variables by calculating the free variables from the
 -- AST and comparing against those specified in the lambda form.
 checkLamFVs :: LambdaForm -> [Var] -> Bool
 checkLamFVs (MkLambdaForm vs _ xs expr) bvs  = 
