@@ -1,0 +1,5 @@
+map = {} \n {f,xs} ->
+        case xs {} of
+            Nil {}      -> 5#;
+            Cons {y,ys} -> 6#;
+            default     -> Nil {};

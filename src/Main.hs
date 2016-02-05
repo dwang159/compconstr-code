@@ -20,6 +20,7 @@ import Lexer
 import Parser
 import CmdArgs
 import Interpreter
+import P (checkProgFVs)
 
 --------------------------------------------------------------------------------
 
@@ -75,7 +76,8 @@ main = do
 
         case r of
             Left err  -> putStrLn err
-            Right ast -> do
+            Right ast -> if checkProgFVs ast then 
+                do
                 -- render the AST
                 putStrLn $ render $ pp ast
                 putStrLn ""
@@ -85,6 +87,8 @@ main = do
                     text "Evaluating" <+> text input <+> text "..."
 
                 steps $ initialState ast (argsEntry args)
+            else do
+                putStrLn "Free value check failed!"
 
     -- do nothing
     return ()

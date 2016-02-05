@@ -15,6 +15,7 @@ import Lexer
 import AST
 import Data.List (union, elem)
 import qualified Data.Set as S
+import Debug.Trace (trace)
 
 --------------------------------------------------------------------------------
 
@@ -126,9 +127,7 @@ getExprFVs (CaseE expr alts _)    bvs = getAltFVs alts bvs `union` getExprFVs ex
 getExprFVs (AppE fun atoms _)     bvs = if elem fun bvs 
                                         then getAtomsFVs atoms bvs
                                         else fun : (getAtomsFVs atoms bvs)
-getExprFVs (CtrE fun atoms _)     bvs = if elem fun bvs 
-                                        then getAtomsFVs atoms bvs
-                                        else fun : (getAtomsFVs atoms bvs)
+getExprFVs (CtrE _ atoms _)       bvs = getAtomsFVs atoms bvs
 getExprFVs (OpE _ atoms _)        bvs = getAtomsFVs atoms bvs
 getExprFVs (LitE _ _)             bvs = []
 
@@ -146,6 +145,7 @@ getAtomsFVs ((VarAtom v _) : as) bvs = if elem v bvs
                                        then getAtomsFVs as bvs
                                        else v : (getAtomsFVs as bvs)
 getAtomsFVs ((LitAtom _ _) : as) bvs = getAtomsFVs as bvs
+getAtomsFVs [] bvs = []
 
 
 -- Alts
@@ -158,11 +158,13 @@ getAltFVs (PrimAlts alts dalt) bvs = getPrimAltFVs alts bvs `union`
 getAlgAltFVs :: [AlgAlt] -> [Var] -> [Var]
 getAlgAltFVs (AAlt _ vs expr _ : alts) bvs = getExprFVs expr (bvs`union` vs) 
     `union` getAlgAltFVs alts bvs
+getAlgAltFVs [] bvs = []
 
 -- Prim Alts
 getPrimAltFVs :: [PrimAlt] -> [Var] -> [Var]
 getPrimAltFVs ((PAlt _ expr _) : alts) bvs = getExprFVs expr bvs `union` 
     getPrimAltFVs alts bvs
+getPrimAltFVs [] bvs = []
 
 -- AAlt
 getAAltFVs (AAlt _ vs expr _) bvs = getExprFVs expr (bvs `union` vs)
@@ -181,13 +183,14 @@ checkProgFVs (MkProg binds) = foldl (&&) True (map (\b -> checkBindFVs b gs) bin
     where gs = map bindName binds
 
 checkBindFVs :: Bind -> [Var] -> Bool
-checkBindFVs (MkBind _ lf _) bvs = checkLamFVs lf bvs
+checkBindFVs (MkBind v lf _) bvs = if trace (show v ++ show bvs) True then checkLamFVs lf bvs else False
 
 -- Check lambda free variables by calculating set of free variables from the
 -- AST and comparing against those specified in the lambda form.
 checkLamFVs :: LambdaForm -> [Var] -> Bool
 checkLamFVs (MkLambdaForm vs _ xs expr) bvs  = 
-        S.fromList (getExprFVs expr bvs `union` xs) == S.fromList vs &&
+        trace (show vs ++ show (getExprFVs expr (bvs `union` xs))) True &&
+        S.fromList (getExprFVs expr (bvs `union` xs)) == S.fromList vs &&
         checkExprFVs expr bvs
 
 -- Check expressions to recursively look for more bound lambdas
@@ -195,26 +198,9 @@ checkExprFVs :: Expr -> [Var] -> Bool
 checkExprFVs (LetE binds expr _) bvs = checkExprFVs expr bvs && 
     foldl (&&) True (map (\b -> checkBindFVs b bvs) binds)
 checkExprFVs (LetRecE binds expr _) bvs = checkExprFVs expr bvs && 
-    foldl (&&) True (map (\b -> checkBindFVs b bvs) binds)
-checkExpr _ _ = True
-
-
-------Scratch
---checkLamFVs :: LambdaForm -> [Var] -> Bool
---checkLamFVs (MkLambdaForm fvs _ vs lf) boundVars = 
---        checkExprFVs lfExpr fvs (boundVars ++ vs)
---
---
---checkExprFVs :: Expr -> [Var] -> [Var] -> Bool
---checkExprFVs LetE
---checkExprFVs LetE
---checkExprFVs CtrE = True
---checkExprFVs OpE =
---checkExprFVs
---
---checkAltFVs :: Alt -> Bool
---
---checkAllFVs :: Prog -> Bool
---checkAllFVs MkProg binds = 
---    let globals = map (\x -> bindName x) in 
---        all (map (checkFVs globals) binds)
+    foldl (&&) True (map (\b -> checkBindFVs b (bvs ++ (map bindName binds))) binds)
+checkExprFVs (CaseE _ _ _) _ = True
+checkExprFVs (AppE _ _ _) _ = True
+checkExprFVs (CtrE _ _ _) _ = True
+checkExprFVs (OpE _ _ _) _ = True
+checkExprFVs (LitE _ _) _ = True
