@@ -13,6 +13,8 @@ import Pretty
 import Token
 import Lexer
 import AST
+import Data.List (union, elem)
+import qualified Data.Set as S
 
 --------------------------------------------------------------------------------
 
@@ -111,77 +113,108 @@ mkInt :: TokenP -> P Atom
 mkInt (TPrimInt val, pos) = return $ LitAtom val (toPosn pos)
 
 -------------------------------------------------------------------------------
--- Check lambda free variables by calculating set of free variables from the
--- AST and comparing against those specified in the lambda form.
-checkLamFVs :: LambdaForm -> Set Var -> Bool
-checkLamFVs (MkLambdaForm vs _ xs lf) boundVars  = 
-        (getExprFVs lf boundVars) == S.fromList vs && 
-        checkExprFVs (boundVars `union` xs) lf
 
 -- gets expression FVs
-getExprFVs :: Expr -> [Var] -> Set Var
+getExprFVs :: Expr -> [Var] -> [Var]
 getExprFVs (LetE binds expr _)    bvs = 
-    let bvs' = S.fromList (map bindName binds) `union` bvs in
-        getBindFVs binds bvs `union` exprFVS bvs' expr
+    let bvs' =  (map bindName binds) `union` bvs in
+        getBindFVs binds bvs `union` getExprFVs expr bvs'
 getExprFVs (LetRecE binds expr _) bvs = 
-    let bvs' = S.fromList (map bindName binds) `union` bvs in
-        getBindFVs binds bvs' `union` exprFVS bvs' expr
-getExprFVs (CaseE expr alts _)    bvs = getAltFVs alts bvs `union` getExprFVs expr
-getExprFVs (AppE fun atoms _)     bvs = if member fun bvs 
-                                        then getAtomsFVs bvs
-                                        else insert a (getAtomsFVs bvs)
-getExprFVs (CtrE fun atoms _)     bvs = if member fun bvs 
-                                        then getAtomsFVs bvs
-                                        else insert fun (getAtomsFVs bvs)
-getExprFVs (OpE _ atoms _)        bvs = getAtomsFVs bvs
-getExprFVs (LitE _ _)             bvs = empty
+    let bvs' =  (map bindName binds) `union` bvs in
+        getBindFVs binds bvs' `union` getExprFVs expr bvs'
+getExprFVs (CaseE expr alts _)    bvs = getAltFVs alts bvs `union` getExprFVs expr bvs
+getExprFVs (AppE fun atoms _)     bvs = if elem fun bvs 
+                                        then getAtomsFVs atoms bvs
+                                        else fun : (getAtomsFVs atoms bvs)
+getExprFVs (CtrE fun atoms _)     bvs = if elem fun bvs 
+                                        then getAtomsFVs atoms bvs
+                                        else fun : (getAtomsFVs atoms bvs)
+getExprFVs (OpE _ atoms _)        bvs = getAtomsFVs atoms bvs
+getExprFVs (LitE _ _)             bvs = []
 
 -- Binds
-getBindFVs :: [Bind] -> [Var] -> Set Var
-getBindFVs ((Bind v lf _) : bs) bvs = getLamFVs lf (insert v bvs)
+getBindFVs :: [Bind] -> [Var] -> [Var]
+getBindFVs ((MkBind v lf _) : bs) bvs = getLamFVs lf (v : bvs)
 
 -- Lambdas
-getLamFVs :: LambdaForm -> Set Var -> Set Var
+getLamFVs :: LambdaForm -> [Var] -> [Var]
 getLamFVs (MkLambdaForm _ _ xs expr) bvs = getExprFVs expr (xs `union` bvs)
 
 -- Gets FVs from atoms (compare to bound, add
-getAtomsFVs :: [Atom] -> [Var] -> Set Var
-getAtomsFVs ((VarAtom v _) : as) bvs = if member v bvs 
-                                       then getAtomsFVs as
-                                       else insert v (getAtomsFVs as)
+getAtomsFVs :: [Atom] -> [Var] -> [Var]
+getAtomsFVs ((VarAtom v _) : as) bvs = if elem v bvs 
+                                       then getAtomsFVs as bvs
+                                       else v : (getAtomsFVs as bvs)
 getAtomsFVs ((LitAtom _ _) : as) bvs = getAtomsFVs as bvs
 
 
 -- Alts
-getAltFVs :: Alts -> [Var] -> Set Var
+getAltFVs :: Alts -> [Var] -> [Var]
 getAltFVs (AlgAlts alts dalt) bvs  = getAlgAltFVs alts bvs `union` 
                                      getDAltFVs dalt bvs
 getAltFVs (PrimAlts alts dalt) bvs = getPrimAltFVs alts bvs `union` 
                                      getDAltFVs dalt bvs
 -- Alg Alts
-getAlgAltFVs :: [AlgAlt] -> [Var] -> Set Var
-getAlgAltFVs alts bvs = map (\(AAlt _ vs expr _) getExprFVs expr) (bvs `union` S.fromList vs)
+getAlgAltFVs :: [AlgAlt] -> [Var] -> [Var]
+getAlgAltFVs (AAlt _ vs expr _ : alts) bvs = getExprFVs expr (bvs`union` vs) 
+    `union` getAlgAltFVs alts bvs
 
 -- Prim Alts
-getPrimAltFVs :: [PrimAlt] -> Set Var -> Set Var
-getPrimAltFVs alts bvs = map (\(PrimAlt _ expr _) -> getExprFVs bvs)
+getPrimAltFVs :: [PrimAlt] -> [Var] -> [Var]
+getPrimAltFVs ((PAlt _ expr _) : alts) bvs = getExprFVs expr bvs `union` 
+    getPrimAltFVs alts bvs
+
+-- AAlt
+getAAltFVs (AAlt _ vs expr _) bvs = getExprFVs expr (bvs `union` vs)
+
+-- PAlt
+getPAltFVs (PAlt _ expr _) bvs = getExprFVs expr bvs
+
+
+-- Default Alts
+getDAltFVs :: DefaultAlt -> [Var] -> [Var]
+getDAltFVs (Default expr _) bvs = getExprFVs expr bvs
+getDAltFVs (DefaultVar v expr _) bvs = getExprFVs expr (v : bvs)
+
+checkProgFVs :: Prog -> Bool
+checkProgFVs (MkProg binds) = foldl (&&) True (map (\b -> checkBindFVs b gs) binds)
+    where gs = map bindName binds
+
+checkBindFVs :: Bind -> [Var] -> Bool
+checkBindFVs (MkBind _ lf _) bvs = checkLamFVs lf bvs
+
+-- Check lambda free variables by calculating set of free variables from the
+-- AST and comparing against those specified in the lambda form.
+checkLamFVs :: LambdaForm -> [Var] -> Bool
+checkLamFVs (MkLambdaForm vs _ xs expr) bvs  = 
+        S.fromList (getExprFVs expr bvs `union` xs) == S.fromList vs &&
+        checkExprFVs expr bvs
+
+-- Check expressions to recursively look for more bound lambdas
+checkExprFVs :: Expr -> [Var] -> Bool
+checkExprFVs (LetE binds expr _) bvs = checkExprFVs expr bvs && 
+    foldl (&&) True (map (\b -> checkBindFVs b bvs) binds)
+checkExprFVs (LetRecE binds expr _) bvs = checkExprFVs expr bvs && 
+    foldl (&&) True (map (\b -> checkBindFVs b bvs) binds)
+checkExpr _ _ = True
+
 
 ------Scratch
-checkLamFVs :: LambdaForm -> [Var] -> Bool
-checkLamFVs (MkLambdaForm fvs _ vs lf) boundVars = 
-        checkExprFVs lfExpr fvs (boundVars ++ vs)
-
-
-checkExprFVs :: Expr -> [Var] -> [Var] -> Bool
-checkExprFVs LetE
-checkExprFVs LetE
-checkExprFVs CtrE = True
-checkExprFVs OpE =
-checkExprFVs
-
-checkAltFVs :: Alt -> Bool
-
-checkAllFVs :: Prog -> Bool
-checkAllFVs MkProg binds = 
-    let globals = map (\x -> bindName x) in 
-        all (map (checkFVs globals) binds)
+--checkLamFVs :: LambdaForm -> [Var] -> Bool
+--checkLamFVs (MkLambdaForm fvs _ vs lf) boundVars = 
+--        checkExprFVs lfExpr fvs (boundVars ++ vs)
+--
+--
+--checkExprFVs :: Expr -> [Var] -> [Var] -> Bool
+--checkExprFVs LetE
+--checkExprFVs LetE
+--checkExprFVs CtrE = True
+--checkExprFVs OpE =
+--checkExprFVs
+--
+--checkAltFVs :: Alt -> Bool
+--
+--checkAllFVs :: Prog -> Bool
+--checkAllFVs MkProg binds = 
+--    let globals = map (\x -> bindName x) in 
+--        all (map (checkFVs globals) binds)
