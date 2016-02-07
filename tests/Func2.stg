@@ -9,3 +9,7 @@ test1 = {} \n {x} ->
             default -> n {0#};
     in
     n {x};
+
+m = {} \n {} -> test1 {0#};
+
+main = {} \n {} -> +# {m, 1#};
