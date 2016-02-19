@@ -7,15 +7,12 @@ module P where
 
 --------------------------------------------------------------------------------
 
-import Control.Applicative
-
 import Pretty
+import Var
 import Token
 import Lexer
 import AST
-import Data.List (union, elem)
-import qualified Data.Set as S
-import Debug.Trace (trace)
+import Types
 
 --------------------------------------------------------------------------------
 
@@ -39,8 +36,6 @@ instance Monad P where
     (MkP m) >>= f = MkP $ \s -> case m s of
         Left err -> Left err
         Right r  -> let (MkP m') = f r in m' s
-
-    return = pure
 
 --------------------------------------------------------------------------------
 
@@ -68,8 +63,17 @@ parseError (tkn, pos) = MkP $ \s -> Left $ render $
 toPosn :: AlexPosn -> Posn
 toPosn (AlexPn a l c) = FilePosn l c
 
-mkBind :: TokenP -> LambdaForm -> P Bind
-mkBind (TVar var, pos) lf = return $ MkBind var lf (toPosn pos)
+mkVar :: TokenP -> P Var
+mkVar (TVar var, pos) = return $ Var var (toPosn pos)
+
+mkTyBind :: AlexPosn -> TokenP -> [Var] -> [AlgCtr] -> P TyBind
+mkTyBind pos (TCtr ctr, _) ps ctrs = return $ MkTyBind ctr ps ctrs (toPosn pos)
+
+mkAlgCtr :: TokenP -> [Type] -> P AlgCtr
+mkAlgCtr (TCtr ctr, pos) ps = return $ MkAlgCtr ctr ps (toPosn pos)
+
+mkBind :: Var -> LambdaForm -> P Bind
+mkBind v@(Var var pos) lf = return $ MkBind v lf pos
 
 mkLambdaForm :: [Var] -> UpdateFlag -> [Var] -> Expr -> P LambdaForm
 mkLambdaForm fvs uf vs expr = return $ MkLambdaForm fvs uf vs expr
@@ -83,8 +87,8 @@ mkLetRecE pos bs expr = return $ LetRecE bs expr (toPosn pos)
 mkCaseE :: AlexPosn -> Expr -> Alts -> P Expr
 mkCaseE pos expr alts = return $ CaseE expr alts (toPosn pos)
 
-mkAppE :: TokenP -> [Atom] -> P Expr
-mkAppE (TVar var, pos) as = return $ AppE var as (toPosn pos)
+mkAppE :: Var -> [Atom] -> P Expr
+mkAppE v@(Var var pos) as = return $ AppE v as pos
 
 mkCtrE :: TokenP -> [Atom] -> P Expr
 mkCtrE (TCtr ctr, pos) as = return $ CtrE ctr as (toPosn pos)
@@ -96,19 +100,19 @@ mkLitE :: TokenP -> P Expr
 mkLitE (TPrimInt val, pos) = return $ LitE val (toPosn pos)
 
 mkAlgAlt :: TokenP -> [Var] -> Expr -> P AlgAlt
-mkAlgAlt (TCtr ctr, pos) vars expr = return $ AAlt ctr vars expr (toPosn pos)
+mkAlgAlt (TCtr ctr, pos) vs expr = return $ AAlt ctr vs expr (toPosn pos)
 
 mkPrimAlt :: TokenP -> Expr -> P PrimAlt
 mkPrimAlt (TPrimInt val, pos) expr = return $ PAlt val expr (toPosn pos)
 
-mkDefaultVar :: TokenP -> Expr -> P DefaultAlt
-mkDefaultVar (TVar var, pos) expr = return $ DefaultVar var expr (toPosn pos)
+mkDefaultVar :: Var -> Expr -> P DefaultAlt
+mkDefaultVar v@(Var var pos) expr = return $ DefaultVar v expr pos
 
 mkDefault :: AlexPosn -> Expr -> P DefaultAlt
 mkDefault pos expr = return $ Default expr (toPosn pos)
 
-mkVar :: TokenP -> P Atom
-mkVar (TVar var, pos) = return $ VarAtom var (toPosn pos)
+mkVarAtom :: Var -> P Atom
+mkVarAtom v@(Var var pos) = return $ VarAtom v pos
 
 mkInt :: TokenP -> P Atom
 mkInt (TPrimInt val, pos) = return $ LitAtom val (toPosn pos)

@@ -20,18 +20,19 @@ import Prim
 --------------------------------------------------------------------------------
 
 -- | Enumerates token types.
-data Token = TVar String -- ^ Variables [a-z][a-zA-Z0-9]*
-           | TCtr String -- ^ Constructors [a-z][a-zA-Z0-9]*
+data Token = TVar String -- ^ Variables
+           | TCtr String -- ^ Constructors
 
-           -- symbols
            | TEquals
            | TSemicolon
            | TArrow
            | TCurlyL
            | TCurlyR
            | TComma
+           | TBar
+           | TParL
+           | TParR
 
-           -- keywords
            | TLet
            | TLetRec
            | TCase
@@ -40,12 +41,13 @@ data Token = TVar String -- ^ Variables [a-z][a-zA-Z0-9]*
            | TDefault
            | TUpdatable
            | TNotUpdatable
+           | TType
 
-           -- primitives
+           | TIntTy
+
            | TPrimInt PrimInt
            | TPrimOp PrimOp
 
-           -- end of file marker
            | TEoF
 
            deriving (Eq, Show)
@@ -62,6 +64,9 @@ instance PP Token where
     pp TCurlyL       = char '{'
     pp TCurlyR       = char '}'
     pp TComma        = char ','
+    pp TBar          = char '|'
+    pp TParL         = char '('
+    pp TParR         = char ')'
 
     pp TLet          = text "let"
     pp TLetRec       = text "letrec"
@@ -69,6 +74,10 @@ instance PP Token where
     pp TIn           = text "in"
     pp TOf           = text "of"
     pp TDefault      = text "default"
+    pp TType         = text "type"
+
+    pp TIntTy        = text "Int#"
+
     pp TUpdatable    = text "\\u"
     pp TNotUpdatable = text "\\n"
 
