@@ -78,8 +78,7 @@ main = do
 
         case r of
             Left err  -> putStrLn err
-            Right ast -> if checkProgFVs ast then 
-                do
+            Right ast -> do
                 -- render the AST
                 when (argsVerbose args) $ do
                     putStrLn $ render $ pp ast

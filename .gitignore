@@ -14,7 +14,10 @@ cabal.sandbox.config
 *.aux
 *.hp
 .stack-work/
+*.swp
+*.out
 
 *.c
 *.exe
 *.log
+

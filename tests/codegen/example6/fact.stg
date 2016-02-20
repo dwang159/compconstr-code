@@ -1,0 +1,10 @@
+fact = {} \n {n} ->
+    letrec factIter = {} \n {n, result} -> case n {} of
+        0# -> +# {result, 0#};
+        default -> let x = {n} \n {} -> -# {n, 1#};
+                       y = {n, result} \n {} -> *# {result, n}; 
+                   in factIter {x,y};
+    in
+    factIter {n, 1#};
+
+main = {} \n {} -> fact {5#};
