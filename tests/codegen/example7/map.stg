@@ -1,0 +1,21 @@
+type Bool {} = False | True;
+fib = {} \n {n} ->
+         letrec applyFib = {m} \u {m} ->
+             case m {} of
+                 0#      -> 0#;
+                 1#      -> 1#;
+                 default -> let m1   = {m}  \u {} -> -# {m,1#};
+                                m2   = {m}  \u {} -> -# {m,2#};
+                                fib1 = {m1} \u {} -> applyFib {m1};
+                                fib2 = {m2} \u {} -> applyFib {m2};
+                            in +# {fib1,fib2};
+         in
+             applyFib {n};
+ 
+ index = {} \n {} -> 6#;
+ 
+ checkFibAns = {} \n {ans} -> case ans {} of
+     8#      -> True {};
+     default -> False {};
+ 
+ main = {} \n {} -> let ans = {} \u {} -> fib {index}; in checkFibAns {ans};
