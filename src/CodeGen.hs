@@ -552,15 +552,27 @@ compEvac lf = withNewFunction "_evac_" $ do
 
     -- make the C compiler happy (remove this once you have implemented
     -- your code generation code)
-    --returnSymbol (PrimSym $ MkPrimInt 0)
+    -- returnSymbol (PrimSym $ MkPrimInt 0)
 
 
 -- | `compScavenge vs` generates code for a closure's scavaging code.
 compScavenge :: [AVar PolyType] -> CodeGen (Symbol Function)
 compScavenge vs = withNewFunction "_scavage_" $ do
     -- 1. back up the Node register
+    backup <- loadLocalFromRegister NodeR "node" (MonoTy PrimIntTy)
 
     -- 2. call the evac and scavenging code for each pointer
+    let callCode _ _ 0 = return ()
+        callCode (v : vs) idx num = 
+            if isPrimitive (varAnn v)
+                then do 
+                    callEvac backup idx
+                    callScav backup idx
+                    callCode vs (idx + 1) (num -1)
+                else
+                    do callCode vs (idx + 1) (num -1)
+
+    callCode vs 1 (length vs)
 
     -- return something to make gcc happy (don't remove this)
     returnSymbol (RegisterSym NodeR)
